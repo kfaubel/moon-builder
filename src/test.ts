@@ -19,21 +19,21 @@ async function run() {
     const moonTimesInstance = new MoonTimes(latitude, longitude, timezone, date, timeformat);
 
 
-    console.log("Sunrise:", moonTimesInstance.sunrise);
-    console.log("Sunset:", moonTimesInstance.sunset);
-    console.log("Civil Twilight Begin:", moonTimesInstance.civilTwilightBegin);
-    console.log("Civil Twilight End:", moonTimesInstance.civilTwilightEnd);
-    console.log("Nautical Twilight Begin:", moonTimesInstance.nauticalTwilightBegin);
-    console.log("Nautical Twilight End:", moonTimesInstance.nauticalTwilightEnd);
-    console.log("Astronomical Twilight Begin:", moonTimesInstance.astronomicalTwilightBegin);
-    console.log("Astronomical Twilight End:", moonTimesInstance.astronomicalTwilightEnd);
-    console.log("Moonrise:", moonTimesInstance.moonrise);
-    console.log("Moonset:", moonTimesInstance.moonset);
+    // console.log("Sunrise:", moonTimesInstance.sunrise);
+    // console.log("Sunset:", moonTimesInstance.sunset);
+    // console.log("Civil Twilight Begin:", moonTimesInstance.civilTwilightBegin);
+    // console.log("Civil Twilight End:", moonTimesInstance.civilTwilightEnd);
+    // console.log("Nautical Twilight Begin:", moonTimesInstance.nauticalTwilightBegin);
+    // console.log("Nautical Twilight End:", moonTimesInstance.nauticalTwilightEnd);
+    // console.log("Astronomical Twilight Begin:", moonTimesInstance.astronomicalTwilightBegin);
+    // console.log("Astronomical Twilight End:", moonTimesInstance.astronomicalTwilightEnd);
+    // console.log("Moonrise:", moonTimesInstance.moonrise);
+    // console.log("Moonset:", moonTimesInstance.moonset);
 
     let moonriseHours = parseInt(moonTimesInstance.moonrise.split(":")[0]);
     let moonriseMinutes = parseInt(moonTimesInstance.moonrise.split(":")[1]);
     let moonriseTotalMinutes = moonriseHours * 60 + moonriseMinutes;
-    console.log("Moonrise total minutes:", moonriseTotalMinutes);
+    //console.log("Moonrise total minutes:", moonriseTotalMinutes);
 
     let moonsetHours = parseInt(moonTimesInstance.moonset.split(":")[0]);
     let moonsetMinutes = parseInt(moonTimesInstance.moonset.split(":")[1]);
@@ -41,17 +41,17 @@ async function run() {
     if (moonsetTotalMinutes < moonriseTotalMinutes) {
         moonsetTotalMinutes += 24 * 60;
     }
-    console.log("Moonset total minutes:", moonsetTotalMinutes);
+    //console.log("Moonset total minutes:", moonsetTotalMinutes);
 
     let moonVisible = moonsetTotalMinutes - moonriseTotalMinutes;
-    console.log("Moon visible:", moonVisible, "minutes");
+    //console.log("Moon visible:", moonVisible, "minutes");
 
     let moonVisisbleDegrees = moonVisible / (24 * 60) * 360;
-    console.log("Moon visible degrees of day", moonVisisbleDegrees, " degrees");
+    //console.log("Moon visible degrees of day", moonVisisbleDegrees, " degrees");
 
     let offset = Math.sin((90 - moonVisible/1440 * 180) * Math.PI / 180);
 
-    console.log ("Offset:", offset);
+    //console.log ("Offset:", offset);
 
     const logger: Logger = new Logger("moon-builder", "verbose");
     const cache: Kache = new Kache(logger, "moon-cache.json"); 
