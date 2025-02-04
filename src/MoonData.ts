@@ -69,23 +69,27 @@ export class MoonData {
      * @param dateStr Optional.  Used instead of today to find the data, mostly used for testing.  Format is: YYYY-MM-DD or "yesterday"
      * @returns MoonJson - sun rise/set, moon rise/set, moon illuminaiton, phase, etc.
      */
-    public async getMoonData(lat: string, lon: string, apiKey: string, timeZone: string, dateStr = ""): Promise<MoonJson | null> { 
+    public async getMoonData(lat: string, lon: string, apiKey: string, timeZone: string, dateStr = "", previous: boolean = false): Promise<MoonJson | null> { 
         let sunMoonJson: MoonJson | null = null;
         let dateParam: string;
         try {
-            const now: moment.Moment = moment();
-
             if (dateStr === "") {
+                const now: moment.Moment = moment();
                 dateParam = now.tz(timeZone).format("YYYY-MM-DD");
-            } else if (dateStr == "yesterday") {
-                dateParam = now.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
+                if (previous) {
+                    dateParam = now.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
+                }   
             } else {
                 dateParam = dateStr;
+                if (previous) {
+                    const day: moment.Moment = moment(dateParam);
+                    dateParam = day.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
+                }   
             }
 
             const key = `lat:${lat}-lon:${lon}-date:${dateParam}`;
 
-            this.logger.info(`MoonData: Skipping cache check`);
+            ////this.logger.info(`MoonData: Skipping cache check`);
             //sunMoonJson = this.cache.get(key) as MoonJson;
             if (sunMoonJson !== null) {
                 return sunMoonJson;
@@ -93,7 +97,7 @@ export class MoonData {
 
             const url = `https://api.ipgeolocation.io/astronomy?apiKey=${apiKey}&lat=${lat}&long=${lon}&date=${dateParam}`;
 
-            this.logger.info(`MoonData: GET: ${url}`);
+            this.logger.verbose(`MoonData: GET: ${url}`);
 
             const options: AxiosRequestConfig = {
                 responseType: "json",
@@ -146,7 +150,7 @@ export class MoonData {
 
             const midnightTonight = moment().tz(timeZone).endOf("day");
             //this.cache.set(key, sunMoonJson, midnightTonight.valueOf()); 
-            this.logger.info(`MoonData: Skipping cache save`);           
+            ////this.logger.info(`MoonData: Skipping cache save`);           
         } catch (e) {
             if (e instanceof Error) {
                 this.logger.error(`MoonData: ${e.stack}`);

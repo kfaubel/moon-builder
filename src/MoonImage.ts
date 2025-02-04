@@ -28,18 +28,23 @@ export class MoonImage {
     
     private imageHeight: number;
     private imageWidth: number;
-    private chartOriginX: number;
-    private chartOriginY: number;
-    private chartWidth: number;
-    private chartHeight: number;
+    
+    private curveWidth: number;
+    private curveHeight: number;
+
+    private dateX: number;
+    private dateY: number;
+    private titleY: number;
 
     private backgroundColor: string;
+    private titleColor: string;
+    private labelColor: string;
     private gridColor: string;
-    private sineColor: string;
-    private sineWaveHeight: number;
-    private sineWaveWidth: number;
+    private gridWidth: number;
     private moonXOrigin: number;
     private moonYOrigin: number;
+    private moonPathColor: string;
+    private moonPathWidth: number;
     private moonColor: string;
     private moonRadius: number;
 
@@ -55,24 +60,24 @@ export class MoonImage {
         this.imageHeight = 1080; 
         this.imageWidth  = 1920; 
 
-        // Screen origin is the upper left corner
-        this.chartOriginX = 100;                                                         // In from the left edge
-        this.chartOriginY = this.imageHeight - 30;    
+        this.dateX = this.imageWidth * 4/5;
+        this.dateY = this.imageHeight - 20; 
+        this.titleY = 90;
 
-        this.chartWidth = 1680;                                                          // Smaller than the imageWidth but must be a multiple of hoursToShow
-        this.chartHeight = 900;  
+        this.curveWidth = 1440;                                                          // Smaller than the imageWidth but must be a multiple of hoursToShow
+        this.curveHeight = 150;  
 
         this.backgroundColor = "#e0e0e0";              // format needed by myFillRect
-        this.gridColor = "#707070";
-        this.sineColor = "#B0B0B0";
-        this.sineWaveHeight = 100;
-        this.sineWaveWidth = 1440;                     // 24 hours * 60 minutes
-        this.moonXOrigin = 100;
-        this.moonYOrigin = 400
-        this.moonColor = "#303030";
-        this.moonRadius = 20;                     
-
-
+        this.titleColor      = "#2020B0"; 
+        this.labelColor      = "#2020B0";
+        this.gridColor       = "#A0A0A0";
+        this.gridWidth       = 3;
+        this.moonXOrigin     = 200;
+        this.moonYOrigin     = 500;
+        this.moonPathColor   = "#666";
+        this.moonPathWidth   = 4;
+        this.moonColor       = "#666"; //"#303030";
+        this.moonRadius      = 40;                     
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,172 +94,10 @@ export class MoonImage {
      * @returns ImageResult or null
      */
     public async getImage(location: string, lat: string, lon: string, apiKey: string, timeZone: string, dateStr = "") : Promise<ImageResult | null> {        
-        
-        const lunarDayLengthMinutes = 24 * 60 + 50; // Lunar day is 24 hours and 50 minutes
-
-        const moonData: MoonData = new MoonData(this.logger, this.cache);
-
-        const moonJson: MoonJson | null = await  moonData.getMoonData(lat, lon, apiKey, timeZone, dateStr);
-
-        if (moonJson === null) {
-            this.logger.error(`MoonImage: getImage() failed to get data for ${location} on ${dateStr}`);
-            return null;
-        }
-
-        const moonRiseMinutes: number | null = this.getMinutes(moonJson.moonrise);
-        const moonSetMinutes: number | null = this.getMinutes(moonJson.moonset);
-
-        this.logger.info(`MoonImage: getImage() moonRiseMinutes: ${moonRiseMinutes !== null ? moonRiseMinutes : "null"}`);
-        this.logger.info(`MoonImage: getImage() moonSetMinutes: ${moonSetMinutes !== null ? moonSetMinutes : "null"}`);
-
-        // We have 4 cases to consider:
-        // 1. Moonrise and moonset are both today and moonrise is before moonset (e.g.: New moon)
-        //    * This is simple, we can start the graph at (-moonrise)
-        //    * We also know the duration of the moon above the horizon to adjust the graph up and down
-        // 2. Moonrise and moonset are both today and moonrise is after moonset (e.g.: Full moon)
-        //    * We can figure out when the previous moonrise was based on the moonset and the duration of the moon above the horizon
-        // 3. Only a moonrise today 
-        //    * We need to use the previous day's moonset to calculate the duration of the moon above the horizon
-        // 4. Only a moonset today
-        //    * We need to use the previous day's moonrise to calculate the duration of the moon above the horizon
-        
-        let previousMoonRiseMinutes: number | null = null;
-        let previousMoonSetMinutes: number | null = null;
-        let moonAboveHorizonMinutes = 0;
-        let moonMinutesOffset = 0;
-
-        if (moonRiseMinutes !== null && moonSetMinutes !== null) {
-            if (moonRiseMinutes < moonSetMinutes) {
-                // Case 1: Moonrise and moonset are both today and moonrise is before moonset
-                moonAboveHorizonMinutes = moonSetMinutes - moonRiseMinutes;
-                moonMinutesOffset = - (moonRiseMinutes);
-
-                this.logger.verbose(`MoonImage: getImage() Case 1: Moonrise and moonset are both today and moonrise is before moonset`);
-                this.logger.verbose(`MoonImage: getImage() moonAboveHorizonMinutes: ${moonAboveHorizonMinutes}`);                
-                this.logger.verbose(`MoonImage: getImage() moonMinutesOffset: ${moonMinutesOffset}`);
-            } else {
-                // Case 2: Moonrise and moonset are both today and moonrise is after moonset
-                // moon below the hoizon is: moonRiseMinutes - moonSetMinutes
-                // moon above the horizon is: lunarDayLengthMinutes - (moon below the horizon in minutes)
-                moonAboveHorizonMinutes = lunarDayLengthMinutes - (moonRiseMinutes - moonSetMinutes);
-                // moonMinutesOffset = - (moonRiseMinutes - moonAboveHorizonMinutes);
-                moonMinutesOffset = - (moonRiseMinutes);
-
-
-
-                // moonAboveHorizonMinutes is 828, should be around 650
-
-                this.logger.verbose(`MoonImage: getImage() Case 2: Moonrise and moonset are both today and moonrise is after moonset`);
-                this.logger.verbose(`MoonImage: getImage() moonAboveHorizonMinutes: ${moonAboveHorizonMinutes}`);
-                this.logger.verbose(`MoonImage: getImage() moonMinutesOffset: ${moonMinutesOffset}`);
-            }
-            
-        } else if (moonSetMinutes === null && moonRiseMinutes !== null) {
-            // Case 3: Only a moonrise today
-            // If there is no moonset, we need to use the previous day's moonrise
-            const previousMoonJson = await moonData.getMoonData(lat, lat, apiKey, timeZone, "yesterday");
-            if (previousMoonJson === null) {
-                this.logger.error(`MoonImage: getImage() failed to get previous data for ${location} on ${dateStr} "yesterday"`);
-                return null;
-            }
-            previousMoonSetMinutes = this.getMinutes(previousMoonJson.moonset);
-            if (previousMoonSetMinutes === null) {
-                this.logger.error(`MoonImage: getImage() failed to get previous moonrise minutes from ${previousMoonJson.moonset}`);
-                return null;
-            }
-
-            // Add the part of lunar night from yesterday to the lunar night today.  Then subtract from the length of the lunar day   
-            moonAboveHorizonMinutes = lunarDayLengthMinutes - ((lunarDayLengthMinutes) - previousMoonSetMinutes) + moonRiseMinutes;
-            moonMinutesOffset = - ((lunarDayLengthMinutes - moonAboveHorizonMinutes) + moonRiseMinutes);
-
-            this.logger.verbose(`MoonImage: getImage() Case 3: Only a moonrise today`);
-            this.logger.verbose(`MoonImage: getImage() moonAboveHorizonMinutes: ${moonAboveHorizonMinutes}`);
-            this.logger.verbose(`MoonImage: getImage() moonMinutesOffset: ${moonMinutesOffset}`);
-        } else if (moonRiseMinutes === null && moonSetMinutes !== null) {
-            // Case 4: Only a moonset today
-           
-            // If there is no moonrise, we need to use the previous day's moonrise
-            const previousMoonJson = await moonData.getMoonData(lat, lat, apiKey, timeZone, "yesterday");
-            if (previousMoonJson === null) {
-                this.logger.error(`MoonImage: getImage() failed to get data for ${location} on ${dateStr} "yesterday"`);
-                return null;
-            }
-            previousMoonRiseMinutes = this.getMinutes(previousMoonJson.moonrise);
-            if (previousMoonRiseMinutes === null) {
-                this.logger.error(`MoonImage: getImage() failed to get moonrise from ${previousMoonJson.moonrise}`);
-                return null;
-            }
-
-            // Add the part of the lunar day from yesterday's moonrise until midnight plus today's minutes until moonset
-            moonAboveHorizonMinutes = ((lunarDayLengthMinutes) - previousMoonRiseMinutes) + moonSetMinutes; 
-            moonMinutesOffset = - (lunarDayLengthMinutes - previousMoonRiseMinutes);
-
-            this.logger.verbose(`MoonImage: getImage() Case 4: Only a moonset today`);
-            this.logger.verbose(`MoonImage: getImage() moonAboveHorizonMinutes: ${moonAboveHorizonMinutes}`);
-            this.logger.verbose(`MoonImage: getImage() moonMinutesOffset: ${moonMinutesOffset}`);
-        } else {
-            // Case X: The moon disappeared!
-            this.logger.error(`MoonImage: getImage() failed to get either a moonrise and moonset for ${location} on ${dateStr}.  Moon disappeared!`);
-            return null;
-        }
-        
-        
-
-        // We need to draw a sine wave with a period of the lunar day (24 hours and 50 minutes)
-
-        
-
-        
-        
-        
-        const twilightDegrees          = 24;     // 24 degrees before sunrise and 24 degrees after sunset
-        const twilightMinutes          = 24 * 4; // 4 minutes per degree (96 minutes)
-
-        const dataDate        = new Date(moonJson.date + "T00:00:00"); // Without the explicit time, Date.Parse assume this is UTC and the day is off by 1.
-        const title           = `Sun & Moon Times for ${location}`;
-        const dateDisplayStr  = `${dataDate.toLocaleString()}`;
-
-        // Define layout constants
-        const imageHeight              = 1080; 
-        const imageWidth               = 1920; 
-
-        const centerX                  = imageWidth/2;
-        const centerY                  = imageHeight/2 + 40;     // leave some extra room at the top for the title
-        const sunCircleRadius          = 380; //imageHeight/3;          //360
-        const moonCircleRadius         = 300; //imageHeight/4;          //270
-        const sunArcWidth              = 20;
-        const moonArcWidth             = 33;
-        const sunRadius                = 35;                     // The actual sun drawn on the circle
-        const moonRadius               = 35;
-
-        const backgroundColor          = "#FFFFFA";              // format needed by myFillRect
-        const circleColor              = "#B0B0B0";
-        const timeLabelColor           = "#B0B0B0"; 
-        const tickColor                = "#B0B0B0";
-        const sunCircleColor           = "#504773"; //"#303050";
-        const sunArcColor              = "#FCD303";
-        const sunUpColor               = "#FDF000";
-        const sunDownColor             = "#D1AF02";
-        const sunTwilightArcColor1     = "#F0E000";
-        const sunTwilightArcColor2     = "#B80010";
-        const sunTwilightArcColor3     = "#7a2100"; //"#500028";
-        const solidTwilightArcColor    = "#d45b0b";
-        const moonArcColor             = "#D0D0D0";
-        const moonUpColor              = "#707070";
-        const moonDownColor            = "#808080";
-        const moonLabelColor           = "#707070";
-        const titleColor               = "#2020F0"; 
-        const labelColor               = "#2020F0";
-        
-        // Approximation of the height of a capital letter
-        const largeFontCharHeight       = 54;
-        const mediumFontCharHeight      = 40;
-        const smallFontCharHeight       = 30;
-        const xsmallFontCharHeight      = 22;
-
+                
         const largeFont                 = "72px 'OpenSans-Bold'";     // Title
         const mediumFont                = "48px 'OpenSans-Regular";   // Other text
-        const smallFont                 = "40px 'OpenSans-Regular'";  // Note at the bottom
+        const smallFont                 = "36px 'OpenSans-Regular'";  // Note at the bottom
         const extraSmallFont            = "30px 'OpenSans-Regular'";  // Note at the bottom
 
         // When used as an npm package, fonts need to be installed in the top level of the main project
@@ -266,26 +109,147 @@ export class MoonImage {
         fntRegular.loadSync();
         fntRegular2.loadSync();
 
-        const titleY                    = 90; // down from the top of the image
+        // Instanciate the MoonData class and use it to get the moon data for today and for yesterday
+        const moonData: MoonData = new MoonData(this.logger, this.cache);
 
-        const moonValuesSpacingY        = 60;
+        const currentMoonJson: MoonJson | null = await  moonData.getMoonData(lat, lon, apiKey, timeZone, dateStr);
+
+        if (currentMoonJson === null) {
+            this.logger.error(`MoonImage: getImage() failed to get data for ${location} on ${dateStr}`);
+            return null;
+        }
+
+        const currentMoonRiseMinutes: number | null = this.getMinutes(currentMoonJson.moonrise);
+        const currentMoonSetMinutes: number | null = this.getMinutes(currentMoonJson.moonset);
+
+        this.logger.verbose(`MoonImage: Current Moon Rise: ${currentMoonJson.moonrise} = ${currentMoonRiseMinutes !== null ? currentMoonRiseMinutes : "null"}`);
+        this.logger.verbose(`MoonImage: Current Moon Set:  ${currentMoonJson.moonset}  = ${currentMoonSetMinutes !== null ? currentMoonSetMinutes : "null"}`); 
+
+        const previousMoonJson = await moonData.getMoonData(lat, lon, apiKey, timeZone, dateStr, true); // true to get the previous day's data
+
+        if (previousMoonJson === null) {
+            this.logger.error(`MoonImage: getImage() failed to get data for ${location} on ${dateStr}`);
+            return null;
+        }
+
+        const previousMoonRiseMinutes: number | null = this.getMinutes(previousMoonJson.moonrise);
+        const previousMoonSetMinutes: number | null = this.getMinutes(previousMoonJson.moonset);
+
+        this.logger.verbose(`MoonImage: Previous Moon Rise: ${previousMoonJson.moonrise} = ${previousMoonRiseMinutes !== null ? previousMoonRiseMinutes : "null"}`);
+        this.logger.verbose(`MoonImage: Previous Moon Set:  ${previousMoonJson.moonset}  = ${previousMoonSetMinutes !== null ? previousMoonSetMinutes : "null"}`); 
         
-        const moonLabelX                = centerX - 180;
-        const moonValueX                = centerX - 40;
+        // Moon cycle period in minutes
+        const moonCyclePeriod = (24 * 60) + 0; // 24 hours and 50 minutes
 
-        const moonHeaderY               = centerY - 140;
-        const moonriseLabelY            = centerY - 60;
-        const moonsetLabelY             = moonriseLabelY + moonValuesSpacingY;
-        const moonAgeLabelY             = moonriseLabelY + moonValuesSpacingY * 2;
-        const moonPhaseLabelY           = moonriseLabelY + moonValuesSpacingY * 3;
+        // Determine which rise and set times to use based on the cases
+        let riseTime: number | null = null;
+        let setTime: number | null = null;
+        let moonVisibleDuration: number = 0;
+        let moonHiddenDuration: number = 0;
+        let moonPeak: number = 0;
+        let yOffset: number = 0;
 
-        const dateX                     = imageWidth * 3/4;
-        const dateY                     = imageHeight - 20;
+        // Case 1: Moon rose and then set on the given day
+        if (currentMoonRiseMinutes !== null && currentMoonSetMinutes !== null && currentMoonRiseMinutes < currentMoonSetMinutes) {
+            this.logger.verbose(`MoonImage: Case 1: Moon rose and then set on the given day`);
+            riseTime = currentMoonRiseMinutes;
+            setTime = currentMoonSetMinutes;
+            moonVisibleDuration = currentMoonSetMinutes - currentMoonRiseMinutes;
+            moonPeak = currentMoonRiseMinutes + moonVisibleDuration/2;
+            const x = riseTime - (moonPeak - (moonCyclePeriod/4)); 
+            yOffset = Math.sin((x/4)/(180/Math.PI)) * this.curveHeight;
+        }
+        // Case 2: Moon set and then later rose on the given day
+        else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes !== null && currentMoonSetMinutes < currentMoonRiseMinutes) {
+            this.logger.verbose(`MoonImage: Case 2: Moon set and then later rose on the given day`);
+            if (previousMoonRiseMinutes === null) {
+                this.logger.error('No previous moon rise time to determine the moon cycle.');
+                return null;
+            }
 
-        const img = pure.make(imageWidth, imageHeight);
+            // This is a fudge factor to make the riseTime closer to the actual rise time.  It is a hack.
+            // Without it, the riseTime is too early and the does not cross the X axis at the right point.
+            // 50 of this fudge factor is to account for the 50 minute difference between the moon cycle and a 24 hour day.
+            const case2FudgeFactor = 70; 
+
+            riseTime = previousMoonRiseMinutes - 1440 + case2FudgeFactor; // Subtract 24 hours to get time on previous day.  It will be negative
+            setTime = currentMoonSetMinutes;
+            
+            moonVisibleDuration = setTime - riseTime;
+            moonHiddenDuration = riseTime - setTime;
+            moonPeak = riseTime + moonVisibleDuration/2;
+            const x = riseTime - (moonPeak - (moonCyclePeriod/4)); 
+            yOffset = Math.sin((x/4)/(180/Math.PI)) * this.curveHeight;
+        }
+        // Case 3: Moon rises in a given day but does not set until the next day
+        else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes === null) {
+            this.logger.verbose(`MoonImage: Case 3: Moon rises in a given day but does not set until the next day`);
+            riseTime = currentMoonRiseMinutes;
+            
+            if (previousMoonSetMinutes === null) {
+                this.logger.error('No previous moon set time to determine the moon cycle.');
+                return null;
+            }
+            
+            setTime = previousMoonSetMinutes - 1440; // Subtract 24 hours to get time on previous day
+
+            moonVisibleDuration = (riseTime - setTime);
+            moonPeak = riseTime + moonVisibleDuration/2;
+            const x = riseTime - (moonPeak - (moonCyclePeriod/4)); 
+            yOffset = Math.sin((x/4)/(180/Math.PI)) * this.curveHeight;
+        }
+        // Case 4: Moon rose the previous day and only sets on the given day
+        else if (currentMoonRiseMinutes === null && currentMoonSetMinutes !== null) {
+            this.logger.verbose(`MoonImage: Case 4: Moon rose the previous day and only sets on the given day`);
+
+            if (previousMoonRiseMinutes === null) {
+                this.logger.error('No previous moon rise time to determine the moon cycle.');
+                return null;
+            }
+
+            // This is a fudge factor to make the riseTime closer to the actual rise time.  It is a hack.
+            // Without it, the riseTime is too early and the does not cross the X axis at the right point
+            const case4FudgeFactor = 10; 
+
+            riseTime = previousMoonRiseMinutes - 1440 + case4FudgeFactor; // Subtract 24 hours to get time on previous day
+            setTime = currentMoonSetMinutes;
+
+            moonVisibleDuration = setTime - riseTime;
+            moonPeak = riseTime + moonVisibleDuration/2;
+            const x = riseTime - (moonPeak - (moonCyclePeriod/4)); 
+            yOffset = Math.sin((x/4)/(180/Math.PI)) * this.curveHeight;
+
+        } else {
+            this.logger.error('Insufficient data to plot the moon cycle.  Not one of the 4 cases we need.');
+            return null;
+        }
+
+        if (riseTime === null || setTime === null) {
+            this.logger.error('Failed to determine rise and set times.');
+            return null;
+        }
+
+        if (moonVisibleDuration === null || moonPeak === null) {
+            this.logger.error('Cannot determine moon duration or peak time.');
+            return null;
+        }
+
+        this.logger.verbose(`MoonImage: Computed Moon Rise: ${riseTime}`);
+        this.logger.verbose(`MoonImage: Computed Moon Set:  ${setTime}`);
+        this.logger.verbose(`MoonImage: Computed Moon Visible Duration: ${moonVisibleDuration}`);
+        this.logger.verbose(`MoonImage: Computed Moon Hidden Duration: ${moonHiddenDuration}`);
+        this.logger.verbose(`MoonImage: Computed Moon Peak: ${moonPeak}`);
+        this.logger.verbose(`MoonImage: Computed Moon Y Offset: ${yOffset}`);
+
+        // We have all the data we need.  Create the image
+        const img = pure.make(this.imageWidth, this.imageHeight);
         const ctx = img.getContext("2d");
 
-        // Extend ctx with function to dray centered text
+        const dataDate        = new Date(currentMoonJson.date + "T00:00:00"); // Without the explicit time, Date.Parse assume this is UTC and the day is off by 1.
+        const title           = `Moon Times for ${location}`;
+        const dateDisplayStr  = `${moment(dataDate).format("MMM D, YYYY")}`;
+
+        // Extend ctx with function to draw centered text
         ctx.centerText = function(text: string, x: number, y: number): void {
             const width = this.measureText(text).width;
             this.fillText(text, x - width/2, y);
@@ -294,54 +258,78 @@ export class MoonImage {
         // Fill the background
         //ctx.fillStyle = backgroundColor;
         //ctx.fillRect(0, 0, imageWidth, imageHeight);
-        this.myFillRect(img, 0, 0, imageWidth, imageHeight, this.backgroundColor);
+        this.myFillRect(img, 0, 0, this.imageWidth, this.imageHeight, this.backgroundColor);
 
         // Draw the title
-        ctx.fillStyle = titleColor;
-        ctx.font = mediumFont;
+        ctx.fillStyle = this.titleColor;
+        ctx.font = largeFont;
         const textWidth: number = ctx.measureText(title).width;
-        ctx.fillText(title, (imageWidth - textWidth) / 2, titleY);
+        ctx.fillText(title, (this.imageWidth - textWidth) / 2, this.titleY);
+
+        // Draw the date
+        ctx.fillStyle = this.labelColor;
+        ctx.font = mediumFont;
+        ctx.fillText(dateDisplayStr, this.dateX, this.dateY);
 
         // Draw the baseline for the moon data
-        this.drawLine(ctx, this.moonXOrigin,  this.moonYOrigin, 1540, 400, this.gridColor, 1);
+        this.drawChartLine(ctx, 0,  0, this.curveWidth, 0, this.gridColor, this.gridWidth);
 
+        // Draw the vertical lines for the hours
         for (let i = 0; i <= 24; i++) {
-            this.drawLine(ctx, this.moonXOrigin + i * this.sineWaveWidth/24,  this.moonYOrigin - 10, 100 + i * this.sineWaveWidth/24,  this.moonYOrigin + 10, this.gridColor, 1);
+            this.drawChartLine(ctx, i * this.curveWidth/24, -10, i * this.curveWidth/24,  10, this.gridColor, this.gridWidth);
         }
         
-        for (let i = 0; i <= 24; i = i + 12) {
-            this.drawLine(ctx, this.moonXOrigin + i * this.sineWaveWidth/24,  this.moonYOrigin - 20, 100 + i * this.sineWaveWidth/24,  this.moonYOrigin + 20, this.gridColor, 1);
+        for (let i = 0; i <= 24; i = i + 6) {
+            this.drawChartLine(ctx, i * this.curveWidth/24, -20, i * this.curveWidth/24,  20, this.gridColor, this.gridWidth);
         }
         
-        this.logger.verbose(`MoonImage: Moon above horizon: ${moonAboveHorizonMinutes} minutes`);
+        // Draw the moon path
+        ctx.beginPath();
+        ctx.lineWidth = this.moonPathWidth;
+        ctx.strokeStyle = this.moonPathColor; 
 
+        let x = 0;
+        const cosX = Math.cos((x - moonPeak)/4 * (Math.PI / 180));
+        let y = (cosX * this.curveHeight) - yOffset;
+        ctx.moveTo(this.moonXOrigin + x, this.moonYOrigin - y);
+        for (let x = 0; x <= 1440; x++) {
+            const cosX = Math.cos((x - moonPeak)/4 * (Math.PI / 180));
+            const y = (cosX * this.curveHeight) - yOffset;
+            ctx.lineTo(this.moonXOrigin + x, this.moonYOrigin - y);
+        }
 
+        ctx.stroke();
 
-        //moonAboveHorizonMinutes = lunarDayLengthMinutes/2;
-        const ratio = moonAboveHorizonMinutes/(lunarDayLengthMinutes/2);
-        this.logger.verbose(`MoonImage: ratio: ${ratio}`);
-        const a = 1 - Math.sin((ratio) * (180/Math.PI));
-        this.logger.verbose(`MoonImage: a: ${a}`);
+        if (currentMoonRiseMinutes !== null) {
+            this.drawChartLine(ctx, currentMoonRiseMinutes, 50, currentMoonRiseMinutes, 100, this.labelColor, 2);
 
+            ctx.font = smallFont;
+            
+            const label = "Rise";
+            const textWidth: number = ctx.measureText(label).width;
+            //ctx.fillText(label, this.moonXOrigin + currentMoonRiseMinutes - (textWidth/2), this.moonYOrigin + (this.curveHeight) + 150);
+            
+            const timeStr = this.formatTime(`${Math.floor(currentMoonRiseMinutes/60)}:${currentMoonRiseMinutes%60}`);
+            const timeStrWidth: number = ctx.measureText(timeStr).width;            
+            ctx.fillText(timeStr, this.moonXOrigin + currentMoonRiseMinutes - (timeStrWidth/2), this.moonYOrigin + 150);
+        }
 
-        const yOffset = (1 - ratio) * this.sineWaveHeight;     //-a * this.sineWaveHeight; //Math.sin((moonMinutesOffset/4 - 90)/(180/Math.PI)) * this.sineWaveHeight;
-        this.logger.verbose(`MoonImage: Moon yOffset: ${yOffset}`);
-        ctx.strokeStyle = this.sineColor;
-        ctx.lineWidth = 2
-        this.drawSine(ctx, this.moonXOrigin, this.moonYOrigin, this.sineWaveWidth, this.sineWaveHeight, lunarDayLengthMinutes, moonMinutesOffset, yOffset);
+        if (currentMoonSetMinutes !== null) {
+            this.drawChartLine(ctx, currentMoonSetMinutes, 50, currentMoonSetMinutes, 100,this.labelColor, 2);
+            
+            ctx.font = smallFont;            
+            
+            const label = "Set";
+            const textWidth: number = ctx.measureText(label).width;
+            //ctx.fillText(label, this.moonXOrigin + currentMoonSetMinutes - (textWidth/2), this.moonYOrigin + (this.curveHeight) + 150);
+            
+            const timeStr = this.formatTime(`${Math.floor(currentMoonSetMinutes/60)}:${currentMoonSetMinutes%60}`);
+            const timeStrWidth: number = ctx.measureText(timeStr).width;            
+            ctx.fillText(timeStr, this.moonXOrigin + currentMoonSetMinutes - (timeStrWidth/2), this.moonYOrigin + 150);
+        }
 
-        const currentHour = moment.tz(timeZone).hour();  
-        const currentMinute = moment.tz(timeZone).minute();  
-        this.logger.verbose(`WeatherImage: Current hour: ${currentHour}, minute: ${currentMinute} in location timezone: ${timeZone}`); 
-
-        //private drawSun = (ctx: any, originX: number, originY: number, width: number, height: number, sunPositionMinutes: number, color: string) => {
-     
-        //this.drawSun(ctx, this.sunXOrigin, this.sunYOrigin+ sunGraphYAdjustment, this.sineWaveWidth, this.sineWaveHeight, currentHour * 60 + currentMinute, this.sunColor);
-
-        // Draw the baseline for the moon data
-        //this.drawLine(ctx, this.sunXOrigin, 800, 1540, 800, this.gridColor, 2);
-
-        //this.drawlSine(ctx, 100, 800, 1800, this.sineColor, 4);
+        const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+        this.drawMoon(ctx, nowMinutes, moonPeak, yOffset); 
 
         const jpegImg = jpeg.encode(img, 80);
         
@@ -369,13 +357,11 @@ export class MoonImage {
             Number(timeElements[0]) > 23 ||
             Number(timeElements[1]) < 0 ||
             Number(timeElements[1]) > 59) {
-            this.logger.warn(`MoonImage: getAngle() failed on input "${timeStr}"`);
+            this.logger.warn(`MoonImage: getMinutes() failed on input "${timeStr}"`);
             return null;
         }
 
-        const minutes = +timeElements[0] * 60 + +timeElements[1];
-        
-        return minutes;
+        return +timeElements[0] * 60 + +timeElements[1];
     }
 
     /**
@@ -387,9 +373,10 @@ export class MoonImage {
      * @param w Width of the rect
      * @param h Hieght of the rect
      * @param rgb Color in the form "#rrggbb"
+     * @returns void
      */
     // xeslint-disable-next-line @typescript-eslint/no-explicit-any
-    private myFillRect(img: ImageBuffer, x: number, y: number, w: number, h: number, rgb: string) {
+    private myFillRect(img: ImageBuffer, x: number, y: number, w: number, h: number, rgb: string): void {
         const colorValue = parseInt(rgb.substring(1), 16);
 
         // the shift operator forces js to perform the internal ToUint32 (see ecmascript spec 9.6)
@@ -412,111 +399,42 @@ export class MoonImage {
     }
     
     /**
-     * drawLine Draw a line on the chart
+     * drawLine - Draw a line on the chart
      * @param ctx    - Canvas context
-     * @param x      - x position of the line (Relative to the chartOriginX) 
-     * @param color 
-     * @param width 
+     * @param startX      - x position of the line (Relative to the chartOriginX) 
+     * @param startY      - y position of the line (Relative to the chartOriginY)
+     * @param endX        - x position of the line (Relative to the chartOriginX) 
+     * @param endY        - y position of the line (Relative to the chartOriginY)
+     * @param color       - color string for the line
+     * @param width       - width of the line
+     * @returns void
      */
-    private drawLine = (ctx: any, startX: number, startY: number, endX: number, endY: number, color: string, width: number) => {
+    private drawChartLine = (ctx: any, startX: number, startY: number, endX: number, endY: number, color: string, width: number) => {
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
         ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-    };
-
-    /**
-     * drawSine Draw a sine wave on the chart
-     * @param ctx    - Canvas context (set the stroke style and line width before calling this function)
-     * @param originX - x position of the line (Relative to the chartOriginX)
-     * @param originY - y position of the line (Relative to the chartOriginY)
-     * @param height  - height of the sine wave (0 - peak) in pixels
-     * @param width   - width of the sine wave in pixels (e.g.: 1440)
-     * @param periodMinutes   - width of the sine wave (e.g.: 1440 for the sun, 1490 for the moon)
-     * @param xOffset  - x position of the line (in minutes)
-     * @param yOffset - y offset of the sine wave used to adjust the graph up and down (possitive moves the graph up)
-     */
-    private drawSine = (ctx: any, originX: number, originY: number, width: number, height: number, 
-                        periodMinutes: number, xOffset: number, yOffset: number) => {
-        const minutesPerDegree = width/360;  // (typically 4)
-        const degreesPerRadian = 180/Math.PI;
-
-        ctx.beginPath();
-        const y0 = originY + yOffset - Math.sin((xOffset/4)/(180/Math.PI)) * height;
-
-        ctx.moveTo(originX, y0);
-
-        for (let i = 1; i <= width; i++) {
-            const x = originX + i;
-            //const y = originY + yOffset - Math.sin(((xOffset + i)/4)/(180/Math.PI)) * height;
-            const y = originY + yOffset - Math.sin((xOffset + i)/minutesPerDegree/degreesPerRadian) * height;
-            ctx.lineTo(x, y);
-        }
-        
+        ctx.moveTo(this.moonXOrigin + startX, this.moonYOrigin + startY);
+        ctx.lineTo(this.moonXOrigin + endX, this.moonYOrigin + endY);
         ctx.stroke();
     };
     
     /**
-     * drawVerticalLine Draw a vertical line on the chart
+     * drawMoon - Draw the moon on the chart
      * @param ctx    - Canvas context
-     * @param originX - x position of the line (Relative to the chartOriginX)
-     * @param originY - y position of the line (Relative to the chartOriginY)
-     * @param width   - width of the sine wave
-     * @param height  - height of the sine wave
-     * @param sunPositionMinutes  - x position of the line (in minutes)
-     * @param color   - color of the line     * 
+     * @param time   - time in minutes to draw the moon along the X axis
+     * @param moonPeak - time in minutes when the moon is at its peak
+     * @param yOffset - offset to draw the moon along the Y axis
      */
-    private drawMoon = (ctx: any, originX: number, originY: number, width: number, height: number, sunPositionMinutes: number, color: string) => {
+    private drawMoon = (ctx: any, time: number, moonPeak: number, yOffset: number) => {
         
+        const cosX = Math.cos((time - moonPeak)/4 * (Math.PI / 180));
+        const y = (cosX * this.curveHeight) - yOffset;
+
         ctx.beginPath();
-        
-        const x = originX + sunPositionMinutes;
-        const y = originY - Math.sin((sunPositionMinutes/4 - 90)/(180/Math.PI)) * height;
+        ctx.fillStyle = this.moonColor;
             
-        ctx.arc(x, y, this.moonRadius, 0, 2 * Math.PI);  // Now draw the sun itself
+        ctx.arc(this.moonXOrigin + time, this.moonYOrigin - y, this.moonRadius, 0, 2 * Math.PI);  // Now draw the sun itself
         ctx.fill();
-    };
-    
-    /**
-     * drawVerticalLine Draw a vertical line on the chart
-     * @param ctx    - Canvas context
-     * @param x      - x position of the line (Relative to the chartOriginX) 
-     * @param color 
-     * @param width 
-     */
-    private drawChartVerticalLine = (ctx: any, x: number, color: string, width: number) => {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = width;
-        const startX = this.chartOriginX + x;
-        const endX = this.chartOriginX + x;
-        const startY = this.chartOriginY;
-        const endY = this.chartOriginY - (this.chartHeight);
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-    };
-
-    /**
-     * drawHorizontalLine Draw a horizontal line on the chart
-     * @param ctx    - Canvas context
-     * @param y      - y position of the line (Relative to the chartOriginY) 
-     * @param color 
-     * @param width 
-     */
-    private drawChartHorizontalLine = (ctx: any, y: number, color: string, width: number) => {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = width;
-        const startX = this.chartOriginX;
-        const endX = this.chartOriginX + this.chartWidth;
-        const startY = this.chartOriginY - y;
-        const endY = this.chartOriginY - y;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
     };
 
     /**
@@ -547,6 +465,4 @@ export class MoonImage {
         const amPmStr = (+timeElements[0] > 11) ? "PM" : "AM";
         return `${hour}:${minStr} ${amPmStr}`;
     }
-
-    
 }

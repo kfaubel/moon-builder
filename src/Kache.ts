@@ -42,7 +42,7 @@ export class Kache implements KacheInterface {
                     const cacheItem = this.cacheStorage[key];
         
                     if (cacheItem.expiration < new Date().getTime()) {
-                        this.logger.info(`Cache load: '${key}' has expired, deleting`);
+                        this.logger.verbose(`Cache load: '${key}' has expired, deleting`);
                         delete this.cacheStorage[key];
                     } else {
                         this.logger.verbose(`Cache load: '${key}' still good.`);

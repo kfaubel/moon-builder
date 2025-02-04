@@ -53,7 +53,7 @@ async function run() {
 
     //console.log ("Offset:", offset);
 
-    const logger: Logger = new Logger("moon-builder", "verbose");
+    const logger: Logger = new Logger("moon-builder", "info");
     const cache: Kache = new Kache(logger, "moon-cache.json"); 
     const simpleImageWriter: SimpleImageWriter = new SimpleImageWriter(logger, "images");
     const moonBuilder: MoonBuilder = new MoonBuilder(logger, cache, simpleImageWriter);
@@ -68,30 +68,16 @@ async function run() {
    
     let success = true;
     success = success && await moonBuilder.CreateImages("Onset, MA", "OnsetMoon.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon01.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-01-14");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon02.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-02-15");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon03.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-03-16");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon04.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-04-17");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon05.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-05-18");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon06.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-06-19");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon07.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-07-20");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon08.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-08-21");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon09.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-09-22");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon10.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-10-23");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon11.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-11-24");
-    // // success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon12.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, "2021-12-25");
-
-    // Sunrise before 6AM, sunset after 6PM
-    //success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon-June.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2021-06-21");
-
-    // Sunrise after 6AM and sunset before 6PM, Moon sets in the morning, rises in the afteroon
-    //success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon-dec.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2021-12-21");
-
-    // Sunset before 6PM, twilight after 6PM
-    //success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon-sep.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2021-09-01");
-
-    // Sunrise after 6AM, twilight before 6AM, Moon rises and falls in the same day
-    //success = success && await sunmoonBuilder.CreateImages("Onset, MA", "OnsetSunMoon-mar.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2021-03-08");
+    logger.info("===");
+    success = success && await moonBuilder.CreateImages("Onset, MA", "OnsetMoon-Jan25.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2025-01-25");
+    logger.info("===");
+    success = success && await moonBuilder.CreateImages("Onset, MA", "OnsetMoon-Jan15.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2025-01-15");
+    logger.info("===");
+    success = success && await moonBuilder.CreateImages("Onset, MA", "OnsetMoon-Jan06.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2025-01-06");
+    logger.info("===");
+    success = success && await moonBuilder.CreateImages("Onset, MA", "OnsetMoon-Feb19.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2025-02-19");
+    logger.info("===");
+    success = success && await moonBuilder.CreateImages("Onset, MA", "OnsetMoon-Feb12.jpg", "42.4", "-71.6", IPGEOLOACATION_API_KEY, timeZone, "2025-02-12");
 
     logger.info(`test.ts: Done: ${success ? "successfully" : "failed"}`); 
 
