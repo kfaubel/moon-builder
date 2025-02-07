@@ -16,6 +16,17 @@ export class MoonBuilder {
         this.writer = writer;
     }
 
+    /**
+     * Create an image of the moon for the given location and date
+     * @param location - Location name for display in the title
+     * @param fileName - Name of the file to save
+     * @param lat - Latitude
+     * @param lon - Longitude
+     * @param apiKey - API key for the weather service
+     * @param timeZone - name of the time zone for the location
+     * @param dateStr - date to get the image for in the format "YYYY-MM-DD"
+     * @returns - true if the image was created, false if not
+     */
     public async CreateImages(location: string, fileName: string, lat: string, lon: string, apiKey: string, timeZone: string, dateStr:string): Promise<boolean>{
         try {
             const weatherImage: MoonImage = new MoonImage(this.logger, this.cache);

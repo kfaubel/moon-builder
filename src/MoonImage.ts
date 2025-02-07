@@ -7,7 +7,6 @@ import * as fs from "fs";
 import { MoonData, MoonJson } from "./MoonData";
 import { LoggerInterface } from "./Logger";
 import { KacheInterface} from "./Kache";
-import { relativeTimeThreshold } from "moment";
 
 import moment from "moment-timezone";  // https://momentjs.com/timezone/docs/ &  https://momentjs.com/docs/
 
@@ -46,6 +45,7 @@ export class MoonImage {
     private labelColor: string;
     private gridColor: string;
     private gridWidth: number;
+    private gridWidthMajor: number;
     private moonPathColor: string;
     private nighttimeColor: string;
     private daytimeColor: string;
@@ -84,11 +84,12 @@ export class MoonImage {
         this.backgroundColor = "#F0F0F0";              // format needed by myFillRect
         this.titleColor      = "#2020B0"; 
         this.labelColor      = "#2020B0";
-        this.gridColor       = "#A0A0A0";
+        this.gridColor       = "#444";
         this.gridWidth       = 3;
-        this.nighttimeColor  = "#D0E0FF"
+        this.gridWidthMajor  = 5;
+        this.nighttimeColor  = "#C0E0FF"
         this.daytimeColor    = "#FFFFDF"
-        this.moonPathColor   = "#666";
+        this.moonPathColor   = "#2020B0";
         this.moonPathWidth   = 4;
         this.moonColor       = "#666"; //"#303030";
         this.moonRadius      = 40;   
@@ -145,10 +146,7 @@ export class MoonImage {
         const currentMoonRiseMinutes: number | null = this.getMinutes(currentMoonJson.moonrise);
         const currentMoonSetMinutes: number | null = this.getMinutes(currentMoonJson.moonset);
 
-        this.logger.verbose(`MoonImage: Curr Moon Rise (${dateStr}): ${currentMoonJson.moonrise} = ${currentMoonRiseMinutes !== null ? currentMoonRiseMinutes : "null"}`);
-        this.logger.verbose(`MoonImage: Curr Moon Set  (${dateStr}):  ${currentMoonJson.moonset}  = ${currentMoonSetMinutes !== null ? currentMoonSetMinutes : "null"}`); 
-
-        // Get the moon data for the previous day.  This is needed to determine the moon cycle.
+        // Get the moon data for the previous day.  This is needed if there is no rise or set in the current day.
         const prevDate: moment.Moment = moment(dateStr);
         const prevDateStr = prevDate.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
         const previousMoonJson = await moonData.getMoonData(lat, lon, apiKey, timeZone, prevDateStr); // true to get the previous day's data
@@ -160,10 +158,7 @@ export class MoonImage {
 
         const previousMoonRiseMinutes: number | null = this.getMinutes(previousMoonJson.moonrise);
         const previousMoonSetMinutes: number | null = this.getMinutes(previousMoonJson.moonset);
-
-        this.logger.verbose(`MoonImage: Prev Moon Rise (${prevDateStr}): ${previousMoonJson.moonrise} = ${previousMoonRiseMinutes !== null ? previousMoonRiseMinutes : "null"}`);
-        this.logger.verbose(`MoonImage: Prev Moon Set  (${prevDateStr}):  ${previousMoonJson.moonset}  = ${previousMoonSetMinutes !== null ? previousMoonSetMinutes : "null"}`); 
-        
+         
         // Get the moon data for the next day.  This is needed to determine the moon cycle.
         const nextDate: moment.Moment = moment(dateStr);
         const nextDateStr = nextDate.tz(timeZone).add(1, "day").format("YYYY-MM-DD");
@@ -176,7 +171,11 @@ export class MoonImage {
 
         const nextMoonRiseMinutes: number | null = this.getMinutes(nextMoonJson.moonrise);
         const nextMoonSetMinutes: number | null = this.getMinutes(nextMoonJson.moonset);
-
+        
+        this.logger.verbose(`MoonImage: Curr Moon Rise (${dateStr}): ${currentMoonJson.moonrise} = ${currentMoonRiseMinutes !== null ? currentMoonRiseMinutes : "null"}`);
+        this.logger.verbose(`MoonImage: Curr Moon Set  (${dateStr}):  ${currentMoonJson.moonset}  = ${currentMoonSetMinutes !== null ? currentMoonSetMinutes : "null"}`); 
+        this.logger.verbose(`MoonImage: Prev Moon Rise (${prevDateStr}): ${previousMoonJson.moonrise} = ${previousMoonRiseMinutes !== null ? previousMoonRiseMinutes : "null"}`);
+        this.logger.verbose(`MoonImage: Prev Moon Set  (${prevDateStr}):  ${previousMoonJson.moonset}  = ${previousMoonSetMinutes !== null ? previousMoonSetMinutes : "null"}`); 
         this.logger.verbose(`MoonImage: Next Moon Rise (${nextDateStr}): ${nextMoonJson.moonrise} = ${nextMoonRiseMinutes !== null ? nextMoonRiseMinutes : "null"}`);
         this.logger.verbose(`MoonImage: Next Moon Set  (${nextDateStr}):  ${nextMoonJson.moonset}  = ${nextMoonSetMinutes !== null ? nextMoonSetMinutes : "null"}`); 
         
@@ -200,11 +199,9 @@ export class MoonImage {
             return null;
         }
         
+        // Shade the background to show day and night
         const sunriseX = sunriseMinutes * (this.moonPlotWidth / 1440);
         const sunsetX = sunsetMinutes * (this.moonPlotWidth / 1440);
-
-        this.logger.verbose(`MoonImage: sunrise: ${currentMoonJson.sunrise}, sunriseX: ${sunriseX}`)
-        this.logger.verbose(`MoonImage: sunset: ${currentMoonJson.sunset}, sunsetX: ${sunsetX}`)
 
         ctx.fillStyle = this.nighttimeColor;
         const nighttimeWidth1 = sunriseMinutes * (this.moonPlotWidth / 1440);
@@ -229,16 +226,14 @@ export class MoonImage {
         ctx.fillText(dateDisplayStr, this.dateX, this.dateY);
 
         // Draw the big moon
-        this.drawMoon(ctx, currentMoonJson.lunarAgeDays, this.largeMoonX, this.largeMoonY, this.largeMoonSize);
+        await this.drawMoon(ctx, currentMoonJson.lunarAgeDays, this.largeMoonX, this.largeMoonY, this.largeMoonSize);
 
-        // Draw the phase
-        if (typeof currentMoonJson.lunarPhase !== "undefined" && typeof currentMoonJson.lunarIllumination !== "undefined") {
-            ctx.fillStyle = this.labelColor;
-            ctx.font = largeFont;
-            const phaseStr = `${currentMoonJson.lunarPhase} (${currentMoonJson.lunarIllumination})`;
-            ctx.fillText(phaseStr, this.moonPhaseX, this.moonPhaseY);
-        }
-
+        // Draw the phase string
+        ctx.fillStyle = this.labelColor;
+        ctx.font = largeFont;
+        const phaseStr = `${currentMoonJson.lunarPhase} (${currentMoonJson.lunarIllumination})`;
+        ctx.fillText(phaseStr, this.moonPhaseX, this.moonPhaseY);
+        
         // Draw the baseline for the moon data
         this.drawChartLine(ctx, 0,  0, this.moonPlotWidth, 0, this.gridColor, this.gridWidth);
 
@@ -248,29 +243,25 @@ export class MoonImage {
         }
         
         for (let i = 0; i <= 24; i = i + 6) {
-            this.drawChartLine(ctx, i * this.moonPlotWidth/24, -20, i * this.moonPlotWidth/24,  20, this.gridColor, this.gridWidth);
+            this.drawChartLine(ctx, i * this.moonPlotWidth/24, -20, i * this.moonPlotWidth/24,  20, this.gridColor, this.gridWidthMajor);
         }
-        // Determine which rise and set times to use based on the cases
-        let riseTime: number | null = null;
-        let setTime: number | null = null;
-        // let moonVisibleDuration: number = 0;
-        // let moonPeak: number = 0;
-        // let yOffset: number = 0;
-
+        
+        // Determine each of the 4 cases we need to draw the moon path
         // Case 1: Moon rose and then set on the given day
+        // Case 2: Moon set and then later rose on the given day
+        // Case 3: Moon rises in a given day but does not set until the next day
+        // Case 4: Moon rose the previous day and only sets on the given day
         if (currentMoonRiseMinutes !== null && currentMoonSetMinutes !== null && currentMoonRiseMinutes < currentMoonSetMinutes) {
             this.logger.verbose(`MoonImage: Case 1: Moon rose and then set on the given day`);
-            riseTime = currentMoonRiseMinutes;
-            setTime = currentMoonSetMinutes;
+            const riseTime = currentMoonRiseMinutes;
+            const setTime = currentMoonSetMinutes;
 
             // Draw this case in a single path
             this.drawMoonPath(ctx, 0, 1440, riseTime, setTime);
             
             const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-            await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime); 
-        }
-        // Case 2: Moon set and then later rose on the given day
-        else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes !== null && currentMoonSetMinutes < currentMoonRiseMinutes) {
+            await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
+        } else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes !== null && currentMoonSetMinutes < currentMoonRiseMinutes) {
             this.logger.verbose(`MoonImage: Case 2: Moon set and then later rose on the given day`);
             if (previousMoonRiseMinutes === null) {
                 this.logger.error('No previous moon rise time to determine the moon cycle.');
@@ -278,22 +269,20 @@ export class MoonImage {
             }
 
             // This is a fudge factor to make the riseTime closer to the actual rise time.  It is a hack.
-            // Without it, the riseTime is too early and the does not cross the X axis at the right point.
-            // 50 of this fudge factor is to account for the 50 minute difference between the moon cycle and a 24 hour day.
-            const case2FudgeFactor = 50; //70; 
+            // Without it, the riseTime is too early and does not cross the X axis at the right point.
+            // This partially addresses the 50 minute difference between the moon cycle and a 24 hour day.
+            const case2FudgeFactor = 50;  
 
-            riseTime = previousMoonRiseMinutes - 1440 + case2FudgeFactor; // Subtract 24 hours to get time on previous day.  It will be negative
-            setTime = currentMoonSetMinutes;
+            const riseTime = previousMoonRiseMinutes - 1440 + case2FudgeFactor; // Subtract 24 hours to get time on previous day.  It will be negative
+            const setTime = currentMoonSetMinutes;
 
             this.drawMoonPath(ctx, 0, 1440, riseTime, setTime);
             
             const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-            await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime); 
-        }
-        // Case 3: Moon rises in a given day but does not set until the next day
-        else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes === null) {
+            await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
+        } else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes === null) {
             this.logger.verbose(`MoonImage: Case 3: Moon rises in a given day but does not set until the next day`);
-            riseTime = currentMoonRiseMinutes;
+            const riseTime = currentMoonRiseMinutes;
             
             if (previousMoonSetMinutes === null || nextMoonSetMinutes === null) {
                 this.logger.error('No previous moon set time to determine the moon cycle.');
@@ -303,27 +292,23 @@ export class MoonImage {
             const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
             // For the first segment, use the previous moon set
-            setTime = previousMoonSetMinutes - 1440; // Subtract 24 hours to get time on previous day
-            this.logger.verbose(`MoonImage: Segment 1, 0-${riseTime}`);
+            let setTime = previousMoonSetMinutes - 1440; // Subtract 24 hours to get time on previous day
             this.drawMoonPath(ctx, 0, riseTime, riseTime, setTime);
 
             if (nowMinutes <= riseTime) {
-                await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime); 
+                // Draw the moon on the path if it is still before the rise time so we use the first segment setTime
+                await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
             }
             
             // For the second segment, use the next moonset
             setTime = 1440 + nextMoonSetMinutes;
 
-            this.logger.verbose(`MoonImage: Segment 2, ${riseTime}-1440`);
-
             this.drawMoonPath(ctx, riseTime, 1440, riseTime, setTime);
             if (nowMinutes > riseTime) {
-                await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime); 
+                // Draw the moon on the path if it is after the rise time so we use the second segment setTime
+                await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
             }
-            
-        }
-        // Case 4: Moon rose the previous day and only sets on the given day
-        else if (currentMoonRiseMinutes === null && currentMoonSetMinutes !== null) {
+        } else if (currentMoonRiseMinutes === null && currentMoonSetMinutes !== null) {
             this.logger.verbose(`MoonImage: Case 4: Moon rose the previous day and only sets on the given day`);
 
             if (previousMoonRiseMinutes === null || nextMoonRiseMinutes === null) {
@@ -331,20 +316,15 @@ export class MoonImage {
                 return null;
             }
 
-            setTime = currentMoonSetMinutes;
-            riseTime = previousMoonRiseMinutes - 1440; // Subtract 24 hours to get time on previous day
-            this.logger.verbose(`MoonImage: Segment 1, 0-${setTime}`)
+            const setTime = currentMoonSetMinutes;
+            const riseTime = previousMoonRiseMinutes - 1440; // Subtract 24 hours to get time on previous day
+
             this.drawMoonPath(ctx, 0, 1440, riseTime, setTime);
             
             const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-            await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime); 
+            await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
         } else {
             this.logger.error('Insufficient data to plot the moon cycle.  Not one of the 4 cases we need.');
-            return null;
-        }
-
-        if (riseTime === null || setTime === null) {
-            this.logger.error('Failed to determine rise and set times.');
             return null;
         }
        
@@ -433,6 +413,7 @@ export class MoonImage {
         const xOffset = riseTime - (moonPeak - (moonCyclePeriod/4)); 
         const yOffset = Math.sin((xOffset/4)/(180/Math.PI)) * this.moonPlotAplitude;
         
+        this.logger.verbose(`MoonImage: drawMoonPath: Segement ${startX} - ${endX}`);
         this.logger.verbose(`MoonImage: drawMoonPath: Moon Rise: ${riseTime} (${this.minutesToTimeStr(riseTime)})`);
         this.logger.verbose(`MoonImage: drawMoonPath: Moon Set:  ${setTime} (${this.minutesToTimeStr(setTime)})`);
         this.logger.verbose(`MoonImage: drawMoonPath: Moon Visible Duration: ${moonVisibleDuration}`);
@@ -447,7 +428,7 @@ export class MoonImage {
 
         const cosX = Math.cos((startX - moonPeak)/4 * (Math.PI / 180));
         let y = (cosX * this.moonPlotAplitude) - yOffset;
-        ctx.moveTo(this.moonPlotX + startX, this.moonPlotYOrigin - y);
+        ctx.moveTo(this.moonPlotX + startX * this.moonPlotWidth/1440, this.moonPlotYOrigin - y);
         
         for (let x = startX + 1; x <= endX; x++) {
             const cosX = Math.cos((x - moonPeak)/4 * (Math.PI / 180));
@@ -456,6 +437,101 @@ export class MoonImage {
         }
 
         ctx.stroke();
+    }
+    
+    /**
+     * drawMoon - Draw the moon at the specified coordinates
+     * @param ctx - Canvas context
+     * @param ageDays - Age of the moon in days
+     * @param centerX - Center of the moon
+     * @param centerY - Center of the moon
+     * @param size - Size of the moon
+     */
+    private drawMoon = async (ctx: any, ageDays: number, centerX: number, centerY: number, size: number) => {
+        let moonImageName = this.getMoonImageForAge(ageDays);
+
+        try {
+            const readStream = fs.createReadStream(`moon_images/${moonImageName}`);
+            let moonImage = await pure.decodePNGFromStream(readStream);
+            //this.logger.verbose(`drawMoon: moon image: ${moonImage.width} x ${moonImage.height}`);
+
+            ctx.drawImage(moonImage, 0, 0, moonImage.width, moonImage.height,
+                centerX - size/2, centerY - size/2, size, size);
+        } catch(err) {
+            this.logger.warn(`drawMoon: Failed to draw moon image: ${moonImageName}.  Falling back to a circle`);
+            ctx.beginPath();
+            ctx.fillStyle = this.moonColor;
+                
+            ctx.arc(centerX, centerY, size/2, 0, 2 * Math.PI);  // Now draw the sun itself
+            ctx.fill();
+        }
+    }
+
+    /**
+     * drawMoonOnPath - Draw the moon on the chart
+     * @param ctx    - Canvas context
+     * @param time   - time in minutes to draw the moon along the X axis
+     * @param riseTime - time the moon rises in minutes
+     * @param setTime - time the moon sets in minutes
+     * @param age    - age of the moon in days
+     */
+    private drawMoonOnPath = async (ctx: any, time: number, riseTime: number, setTime: number, age: number) => {
+        let moonImageName = this.getMoonImageForAge(age);
+
+        const moonCyclePeriod = (24 * 60) + 0; // 24 hours and 50 minutes
+
+        const moonVisibleDuration = Math.abs(setTime - riseTime);
+        const moonPeak = riseTime + moonVisibleDuration/2;
+        const xOffset = riseTime - (moonPeak - (moonCyclePeriod/4)); 
+        const yOffset = Math.sin((xOffset/4)/(180/Math.PI)) * this.moonPlotAplitude;
+        
+        const cosX = Math.cos((time - moonPeak)/4 * (Math.PI / 180));
+        const y = (cosX * this.moonPlotAplitude) - yOffset;
+
+        // Compute the center of where we want the image to be drawn
+        const moonX = (this.moonPlotX + time) * this.moonPlotWidth/1440; // Convert the time to a percentage of the curveWidth
+        const moonY = this.moonPlotYOrigin - y;
+
+        try {
+            const readStream = fs.createReadStream(`moon_images/${moonImageName}`);
+            let moonImage = await pure.decodePNGFromStream(readStream);
+
+            ctx.drawImage(moonImage, 0, 0, moonImage.width, moonImage.height,
+                moonX - this.moonRadius, moonY - this.moonRadius, this.moonRadius * 2, this.moonRadius * 2);
+        } catch(err) {
+            ctx.beginPath();
+            ctx.fillStyle = this.moonColor;
+                
+            ctx.arc(this.moonPlotX + time, this.moonPlotYOrigin - y, this.moonRadius, 0, 2 * Math.PI);  // Now draw the sun itself
+           
+            ctx.fill();
+        }
+    }
+
+    /**
+     * get a filename for the moon image based on the age of the moon
+     * @param ageDays 
+     * @returns filename of the moon image
+     */
+    private getMoonImageForAge = (ageDays: number): string => {
+        const MOON_PERIOD_DAYS = 29.53058770576;   // Earth days for one moon cycle
+
+        let moonImageName = "";
+
+        const phaseLength = MOON_PERIOD_DAYS/16; // 8 phases but new is 0-1.8 and 27.7-29.5 days, so split into 16 parts
+        if (ageDays < phaseLength)           moonImageName = "new-moon.png";
+        else if (ageDays < phaseLength * 3)  moonImageName = "waxing-crescent.png";
+        else if (ageDays < phaseLength * 5)  moonImageName = "first-quarter.png";
+        else if (ageDays < phaseLength * 7)  moonImageName = "waxing-gibbous"; 
+        else if (ageDays < phaseLength * 9)  moonImageName = "full-moon.png";
+        else if (ageDays < phaseLength * 11) moonImageName = "waning-crescent.png";
+        else if (ageDays < phaseLength * 13) moonImageName = "last-quarter.png";
+        else if (ageDays < phaseLength * 15) moonImageName = "waning-crescent.png";
+        else                                 moonImageName = "new-moon.png";
+
+        this.logger.verbose(`drawMoon: age: ${ageDays}, image: ${moonImageName}`);
+
+        return moonImageName;
     }
 
     /**
@@ -523,6 +599,7 @@ export class MoonImage {
      * @param text - Text to center
      * @param x - X position to center the text
      * @param y - Y position to center the text
+     * @returns void
      */
     private centerText(ctx: any, text: string, x: number, y: number): void {
         const width = ctx.measureText(text).width;
@@ -540,7 +617,7 @@ export class MoonImage {
      * @param width       - width of the line
      * @returns void
      */
-    private drawChartLine = (ctx: any, startX: number, startY: number, endX: number, endY: number, color: string, width: number) => {
+    private drawChartLine = (ctx: any, startX: number, startY: number, endX: number, endY: number, color: string, width: number): void => {
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
         ctx.beginPath();
@@ -548,96 +625,7 @@ export class MoonImage {
         ctx.lineTo(this.moonPlotX + endX, this.moonPlotYOrigin + endY);
         ctx.stroke();
     };
-    
-    /**
-     * drawMoonOnPath - Draw the moon on the chart
-     * @param ctx    - Canvas context
-     * @param time   - time in minutes to draw the moon along the X axis
-     * @param moonPeak - time in minutes when the moon is at its peak
-     * @param yOffset - offset to draw the moon along the Y axis
-     */
-    private drawMoon = async (ctx: any, ageDays: number | undefined, centerX: number, centerY: number, size: number) => {
-        const MOON_PERIOD_DAYS = 29.53058770576;   // Earth days for one moon cycle
-
-        if (typeof ageDays === "undefined") {
-            this.logger.warn(`drawMoon: ageDays is undefied.  Cannot draw moon image`)
-            return
-        }
-
-        let moonImageName = "";
-
-        const phaseLength = MOON_PERIOD_DAYS/16; // 8 phases but new is 0-1.8 and 27.7-29.5 days, so split into 16 parts
-        if (ageDays < phaseLength)           moonImageName = "new-moon.png";
-        else if (ageDays < phaseLength * 3)  moonImageName = "waxing-crescent.png";
-        else if (ageDays < phaseLength * 5)  moonImageName = "first-quarter.png";
-        else if (ageDays < phaseLength * 7)  moonImageName = "waxing-gibbous"; 
-        else if (ageDays < phaseLength * 9)  moonImageName = "full-moon.png";
-        else if (ageDays < phaseLength * 11) moonImageName = "waning-crescent.png";
-        else if (ageDays < phaseLength * 13) moonImageName = "last-quarter.png";
-        else if (ageDays < phaseLength * 15) moonImageName = "waning-crescent.png";
-        else                                 moonImageName = "new-moon.png";
-
-        this.logger.verbose(`drawMoon: age: ${ageDays}, image: ${moonImageName}`);
-
-        try {
-            const readStream = fs.createReadStream(`moon_images/${moonImageName}`);
-            let moonImage = await pure.decodePNGFromStream(readStream);
-
-            ctx.drawImage(moonImage, 0, 0, moonImage.width, moonImage.height,
-                centerX - size/2, centerY - size/2, size, size);
-        } catch(err) {
-            this.logger.warn(`drawMoon: Failed to draw moon image: ${moonImageName}.  Falling back to a circle`);
-            ctx.beginPath();
-            ctx.fillStyle = this.moonColor;
-                
-            ctx.arc(centerX, centerY, size/2, 0, 2 * Math.PI);  // Now draw the sun itself
-            ctx.fill();
-        }
-    }
-
-    /**
-     * drawMoonOnPath - Draw the moon on the chart
-     * @param ctx    - Canvas context
-     * @param time   - time in minutes to draw the moon along the X axis
-     * @param moonPeak - time in minutes when the moon is at its peak
-     * @param yOffset - offset to draw the moon along the Y axis
-     */
-    private drawMoonOnPath = async (ctx: any, time: number, riseTime: number, setTime: number) => {
-
-    const moonCyclePeriod = (24 * 60) + 0; // 24 hours and 50 minutes
-
-    const moonVisibleDuration = Math.abs(setTime - riseTime);
-    const moonPeak = riseTime + moonVisibleDuration/2;
-    const xOffset = riseTime - (moonPeak - (moonCyclePeriod/4)); 
-    const yOffset = Math.sin((xOffset/4)/(180/Math.PI)) * this.moonPlotAplitude;
-    
-    const cosX = Math.cos((time - moonPeak)/4 * (Math.PI / 180));
-    const y = (cosX * this.moonPlotAplitude) - yOffset;
-
-    // Compute the center of where we want the image to be drawn
-    const moonX = (this.moonPlotX + time) * this.moonPlotWidth/1440; // Convert the time to a percentage of the curveWidth
-    const moonY = this.moonPlotYOrigin - y;
-
-    try {
-        const readStream = fs.createReadStream("moon_images/full-moon.png");
-        let moonImage = await pure.decodePNGFromStream(readStream);
-
-        ctx.drawImage(moonImage, 0, 0, moonImage.width, moonImage.height,
-            moonX - this.moonRadius, moonY - this.moonRadius, this.moonRadius * 2, this.moonRadius * 2);
-    } catch(err) {
-        ctx.beginPath();
-        ctx.fillStyle = this.moonColor;
-            
-        ctx.arc(this.moonPlotX + time, this.moonPlotYOrigin - y, this.moonRadius, 0, 2 * Math.PI);  // Now draw the sun itself
-        ctx.fill();
-    }
-
         
-
-
-       
-    };
-
     /**
      * Convert minutes (from midnight) to a time in HH:MM format
      * @param minutes 

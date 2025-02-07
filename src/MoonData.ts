@@ -42,7 +42,6 @@ export interface MoonJson {
     lunarIllumination: string;
     lunarWaxWane: string;
     lunarPhase: string;
-    //lunarPhase2: string;
 }
 
 const MOON_PERIOD_DAYS = 29.53058770576;   // Earth days for one moon cycle
@@ -74,16 +73,15 @@ export class MoonData {
         let dateParam: string;
         try {
             const key = `lat:${lat}-lon:${lon}-date:${dateStr}`;
-
-            ////this.logger.info(`MoonData: Skipping cache check`);
-            //sunMoonJson = this.cache.get(key) as MoonJson;
+            
+            sunMoonJson = this.cache.get(key) as MoonJson;
             if (sunMoonJson !== null) {
                 return sunMoonJson;
             }
 
             const url = `https://api.ipgeolocation.io/astronomy?apiKey=${apiKey}&lat=${lat}&long=${lon}&date=${dateStr}`;
 
-            //this.logger.verbose(`MoonData: GET: ${url}`);
+            //this.logger.verbose(`MoonData: GET: ${url}`);  // Comment out to keep the api key out of the logs
 
             const options: AxiosRequestConfig = {
                 responseType: "json",
@@ -119,12 +117,6 @@ export class MoonData {
                     if (moonsetTotalMinutes < moonriseTotalMinutes) {
                         moonsetTotalMinutes += 24 * 60;
                     }
-                    let moonsetFraction = moonsetTotalMinutes / (24 * 60);    // Fraction of the day when the moon sets (0.0 - 1.0)
-                                                                              // May be the next day
-                    let moonVisible = moonsetTotalMinutes - moonriseTotalMinutes;
-
-                    // TODO: add useful fields to the sunMoonJson object
-
                 })
                 .catch((error) => {
                     this.logger.warn(`MoonData: No data: ${error})`);
@@ -135,8 +127,7 @@ export class MoonData {
             }
 
             const midnightTonight = moment().tz(timeZone).endOf("day");
-            //this.cache.set(key, sunMoonJson, midnightTonight.valueOf()); 
-            ////this.logger.info(`MoonData: Skipping cache save`);           
+            this.cache.set(key, sunMoonJson, midnightTonight.valueOf());    
         } catch (e) {
             if (e instanceof Error) {
                 this.logger.error(`MoonData: ${e.stack}`);
