@@ -36,12 +36,12 @@ export interface MoonJson {
     solor_noon: string;           
     moonrise: string;
     moonset: string;
-    firstLight?: string;
-    lastLight?: string;
-    lunarAgeDays?: number;
-    lunarIllumination?: string;
-    lunarWaxWane?: string;
-    lunarPhase?: string;
+    firstLight: string;
+    lastLight: string;
+    lunarAgeDays: number;
+    lunarIllumination: string;
+    lunarWaxWane: string;
+    lunarPhase: string;
     //lunarPhase2: string;
 }
 
@@ -69,25 +69,11 @@ export class MoonData {
      * @param dateStr Optional.  Used instead of today to find the data, mostly used for testing.  Format is: YYYY-MM-DD or "yesterday"
      * @returns MoonJson - sun rise/set, moon rise/set, moon illuminaiton, phase, etc.
      */
-    public async getMoonData(lat: string, lon: string, apiKey: string, timeZone: string, dateStr = "", previous: boolean = false): Promise<MoonJson | null> { 
+    public async getMoonData(lat: string, lon: string, apiKey: string, timeZone: string, dateStr: string): Promise<MoonJson | null> { 
         let sunMoonJson: MoonJson | null = null;
         let dateParam: string;
         try {
-            if (dateStr === "") {
-                const now: moment.Moment = moment();
-                dateParam = now.tz(timeZone).format("YYYY-MM-DD");
-                if (previous) {
-                    dateParam = now.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
-                }   
-            } else {
-                dateParam = dateStr;
-                if (previous) {
-                    const day: moment.Moment = moment(dateParam);
-                    dateParam = day.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
-                }   
-            }
-
-            const key = `lat:${lat}-lon:${lon}-date:${dateParam}`;
+            const key = `lat:${lat}-lon:${lon}-date:${dateStr}`;
 
             ////this.logger.info(`MoonData: Skipping cache check`);
             //sunMoonJson = this.cache.get(key) as MoonJson;
@@ -95,9 +81,9 @@ export class MoonData {
                 return sunMoonJson;
             }
 
-            const url = `https://api.ipgeolocation.io/astronomy?apiKey=${apiKey}&lat=${lat}&long=${lon}&date=${dateParam}`;
+            const url = `https://api.ipgeolocation.io/astronomy?apiKey=${apiKey}&lat=${lat}&long=${lon}&date=${dateStr}`;
 
-            this.logger.verbose(`MoonData: GET: ${url}`);
+            //this.logger.verbose(`MoonData: GET: ${url}`);
 
             const options: AxiosRequestConfig = {
                 responseType: "json",
@@ -116,7 +102,7 @@ export class MoonData {
 
                     // this.logger.info(`MoonData: Date: ${dateParam} \n${JSON.stringify(res.data, null, 4)}`);
                     sunMoonJson = res.data as MoonJson;
-                    sunMoonJson.lunarAgeDays      = this.getMoonAgeDays(dateParam);
+                    sunMoonJson.lunarAgeDays      = this.getMoonAgeDays(dateStr);
                     sunMoonJson.lunarIllumination = this.getMoonIllumination(sunMoonJson.lunarAgeDays);
                     sunMoonJson.lunarWaxWane      = this.getWaxWane(sunMoonJson.lunarAgeDays);
                     sunMoonJson.lunarPhase        = this.getPhaseStr(sunMoonJson.lunarAgeDays);
