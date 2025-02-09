@@ -451,7 +451,7 @@ export class MoonImage {
         let moonImageName = this.getMoonImageForAge(ageDays);
 
         try {
-            const readStream = fs.createReadStream(`moon_images/${moonImageName}`);
+            const readStream = fs.createReadStream(`./moon_images/${moonImageName}`);
             let moonImage = await pure.decodePNGFromStream(readStream);
             //this.logger.verbose(`drawMoon: moon image: ${moonImage.width} x ${moonImage.height}`);
 
@@ -493,7 +493,7 @@ export class MoonImage {
         const moonY = this.moonPlotYOrigin - y;
 
         try {
-            const readStream = fs.createReadStream(`moon_images/${moonImageName}`);
+            const readStream = fs.createReadStream(`./moon_images/${moonImageName}`);
             let moonImage = await pure.decodePNGFromStream(readStream);
 
             ctx.drawImage(moonImage, 0, 0, moonImage.width, moonImage.height,
