@@ -1,6 +1,6 @@
 {
   "name": "moon-builder",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Create jpegs with data about the moonrise/moonset",
   "main": "index.js",
   "types": "index.d.ts",
@@ -49,6 +49,7 @@
   "files": [
     "build/**/*",
     "fonts/**/*",
+    "moon_images/**/*",
     "index.js",
     "index.d.ts"
   ]
