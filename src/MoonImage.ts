@@ -259,7 +259,9 @@ export class MoonImage {
             // Draw this case in a single path
             this.drawMoonPath(ctx, 0, 1440, riseTime, setTime);
             
-            const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+            //const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+            const nowMinutes: number = moment().tz(timeZone).hours() * 60 + moment().tz(timeZone).minutes();
+            
             await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
         } else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes !== null && currentMoonSetMinutes < currentMoonRiseMinutes) {
             this.logger.verbose(`MoonImage: Case 2: Moon set and then later rose on the given day`);
@@ -278,7 +280,7 @@ export class MoonImage {
 
             this.drawMoonPath(ctx, 0, 1440, riseTime, setTime);
             
-            const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+            const nowMinutes: number = moment().tz(timeZone).hours() * 60 + moment().tz(timeZone).minutes();
             await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
         } else if (currentMoonRiseMinutes !== null && currentMoonSetMinutes === null) {
             this.logger.verbose(`MoonImage: Case 3: Moon rises in a given day but does not set until the next day`);
@@ -289,7 +291,7 @@ export class MoonImage {
                 return null;
             }
             
-            const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+            const nowMinutes: number = moment().tz(timeZone).hours() * 60 + moment().tz(timeZone).minutes();
 
             // For the first segment, use the previous moon set
             let setTime = previousMoonSetMinutes - 1440; // Subtract 24 hours to get time on previous day
@@ -321,7 +323,7 @@ export class MoonImage {
 
             this.drawMoonPath(ctx, 0, 1440, riseTime, setTime);
             
-            const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+            const nowMinutes: number = moment().tz(timeZone).hours() * 60 + moment().tz(timeZone).minutes();
             await this.drawMoonOnPath(ctx, nowMinutes, riseTime, setTime, currentMoonJson.lunarAgeDays); 
         } else {
             this.logger.error('Insufficient data to plot the moon cycle.  Not one of the 4 cases we need.');
