@@ -369,11 +369,6 @@ export class MoonImage {
             ctx.fillText(timeStr, this.moonPlotX + scaledX - (timeStrWidth/2), this.moonPlotYOrigin + 150);
         }
 
-
-
-
-
-
         const jpegImg = jpeg.encode(img, 80);
         
         return {
