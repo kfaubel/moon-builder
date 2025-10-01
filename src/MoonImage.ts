@@ -303,10 +303,19 @@ export class MoonImage {
             this.logger.verbose(`MoonImage: Case 3: Moon rises in a given day but does not set until the next day`);
             const riseTime = currentMoonRiseMinutes;
             
-            if (previousMoonSetMinutes === null || nextMoonSetMinutes === null) {
-                this.logger.error('No previous moon set time to determine the moon cycle.');
+            if (previousMoonSetMinutes === null) {
+                this.logger.error('No previousMoonSetMinutes to determine the moon cycle.');
                 return null;
+            } else {
+                this.logger.verbose(`Previous ${prevDateStr} moon set: ${previousMoonJson.moonset} = ${previousMoonSetMinutes}`);
             }
+
+            if (nextMoonSetMinutes === null) {
+                this.logger.error('No nextMoonSetMinutes to determine the moon cycle.');
+                return null;
+            } else {
+                this.logger.verbose(`Next ${prevDateStr} moon set: ${nextMoonJson.moonset} = ${nextMoonSetMinutes}`);
+            }            
             
             const nowMinutes: number = moment().tz(timeZone).hours() * 60 + moment().tz(timeZone).minutes();
 
