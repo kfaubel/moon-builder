@@ -1,6 +1,6 @@
 {
   "name": "moon-builder",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Create jpegs with data about the moonrise/moonset",
   "main": "index.js",
   "types": "index.d.ts",
@@ -9,7 +9,6 @@
     "build2": "npm run clean && npm run cppure && tsc",
     "cppure": "cp src/pureimage-umd.cjs node_modules/pureimage/dist/pureimage-umd.cjs",
     "clean": "shx rm -rf build/*",
-    "test": "npm run build && node app.js",
     "start": "npm run build && node app.js",
     "prepare": "npm run build",
     "publish": "echo Published.",

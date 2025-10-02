@@ -114,7 +114,7 @@ export class MoonImage {
      * @param dateStr Optional dataString in "YYYY-MM-DD" format
      * @returns ImageResult or null
      */
-    public async getImage(location: string, lat: string, lon: string, apiKey: string, timeZone: string, dateStr = "") : Promise<ImageResult | null> {        
+    public async getImage(location: string, lat: string, lon: string, apiKey: string, timeZone: string, requestedDateStr = "") : Promise<ImageResult | null> {        
                 
         const extraLargeFont            = "80px 'OpenSans-Bold'";     // Title
         const largeFont                 = "65px 'OpenSans-Bold'";     // Title
@@ -133,17 +133,24 @@ export class MoonImage {
 
         // Instanciate the MoonData class and use it to get the moon data for today and for yesterday
         const moonData: MoonData = new MoonData(this.logger, this.cache);
+        let currentDateStr = "";
+        let currentMoment: moment.Moment;
 
-        if (dateStr === "") {
-            const now: moment.Moment = moment();
-            dateStr = now.tz(timeZone).format("YYYY-MM-DD");
+        if (requestedDateStr === "") {
+            currentMoment = moment();
+            currentDateStr = currentMoment.tz(timeZone).format("YYYY-MM-DD");
+        } else {
+            currentMoment = moment(requestedDateStr);
+            currentDateStr = requestedDateStr;
         }
 
+        this.logger.info(`MoonImage: Generating moon image for ${location} (${lat}, ${lon}) requested for ${requestedDateStr} in time zone ${timeZone}`);
+        
         // Get the moon data for the current day
-        const currentMoonJson: MoonJson | null = await  moonData.getMoonData(lat, lon, apiKey, timeZone, dateStr);
+        const currentMoonJson: MoonJson | null = await  moonData.getMoonData(lat, lon, apiKey, timeZone, currentDateStr);
 
         if (currentMoonJson === null) {
-            this.logger.error(`MoonImage: getImage() failed to get current data for ${location} on ${dateStr}`);
+            this.logger.error(`MoonImage: getImage() failed to get current data for ${location} on ${currentDateStr}`);
             return null;
         }
 
@@ -151,9 +158,10 @@ export class MoonImage {
         const currentMoonSetMinutes: number | null = this.getMinutes(currentMoonJson.moonset);
 
         // Get the moon data for the previous day.  This is needed if there is no rise or set in the current day.
-        const prevDate: moment.Moment = moment(dateStr);
-        const prevDateStr = prevDate.tz(timeZone).subtract(1, "day").format("YYYY-MM-DD");
-        const previousMoonJson = await moonData.getMoonData(lat, lon, apiKey, timeZone, prevDateStr); // true to get the previous day's data
+        // Note: The subtract() method changes the original moment, so we use clone() to make a copy first.
+        const prevDateStr = currentMoment.clone().subtract(1, "day").format("YYYY-MM-DD");
+
+        const previousMoonJson = await moonData.getMoonData(lat, lon, apiKey, timeZone, prevDateStr); 
 
         if (previousMoonJson === null) {
             this.logger.error(`MoonImage: getImage() failed to get previous data for ${location} on ${prevDateStr}`);
@@ -164,8 +172,9 @@ export class MoonImage {
         const previousMoonSetMinutes: number | null = this.getMinutes(previousMoonJson.moonset);
          
         // Get the moon data for the next day.  This is needed to determine the moon cycle.
-        const nextDate: moment.Moment = moment(dateStr);
-        const nextDateStr = nextDate.tz(timeZone).add(1, "day").format("YYYY-MM-DD");
+        // Note: The add() method changes the original moment, so we use clone() to make a copy first.
+        const nextDateStr = currentMoment.clone().add(1, "day").format("YYYY-MM-DD");
+        
         const nextMoonJson = await moonData.getMoonData(lat, lon, apiKey, timeZone, nextDateStr); // true to get the previous day's data
 
         if (nextMoonJson === null) {
@@ -176,8 +185,8 @@ export class MoonImage {
         const nextMoonRiseMinutes: number | null = this.getMinutes(nextMoonJson.moonrise);
         const nextMoonSetMinutes: number | null = this.getMinutes(nextMoonJson.moonset);
         
-        this.logger.verbose(`MoonImage: Curr Moon Rise (${dateStr}): ${currentMoonJson.moonrise} = ${currentMoonRiseMinutes !== null ? currentMoonRiseMinutes : "null"}`);
-        this.logger.verbose(`MoonImage: Curr Moon Set  (${dateStr}):  ${currentMoonJson.moonset}  = ${currentMoonSetMinutes !== null ? currentMoonSetMinutes : "null"}`); 
+        this.logger.verbose(`MoonImage: Curr Moon Rise (${currentDateStr}): ${currentMoonJson.moonrise} = ${currentMoonRiseMinutes !== null ? currentMoonRiseMinutes : "null"}`);
+        this.logger.verbose(`MoonImage: Curr Moon Set  (${currentDateStr}):  ${currentMoonJson.moonset}  = ${currentMoonSetMinutes !== null ? currentMoonSetMinutes : "null"}`); 
         this.logger.verbose(`MoonImage: Prev Moon Rise (${prevDateStr}): ${previousMoonJson.moonrise} = ${previousMoonRiseMinutes !== null ? previousMoonRiseMinutes : "null"}`);
         this.logger.verbose(`MoonImage: Prev Moon Set  (${prevDateStr}):  ${previousMoonJson.moonset}  = ${previousMoonSetMinutes !== null ? previousMoonSetMinutes : "null"}`); 
         this.logger.verbose(`MoonImage: Next Moon Rise (${nextDateStr}): ${nextMoonJson.moonrise} = ${nextMoonRiseMinutes !== null ? nextMoonRiseMinutes : "null"}`);
@@ -441,13 +450,13 @@ export class MoonImage {
         const xOffset = riseTime - (moonPeak - (moonCyclePeriod/4)); 
         const yOffset = Math.sin((xOffset/4)/(180/Math.PI)) * this.moonPlotAplitude;
         
-        this.logger.verbose(`MoonImage: drawMoonPath: Segement ${startX} - ${endX}`);
-        this.logger.verbose(`MoonImage: drawMoonPath: Moon Rise: ${riseTime} (${this.minutesToTimeStr(riseTime)})`);
-        this.logger.verbose(`MoonImage: drawMoonPath: Moon Set:  ${setTime} (${this.minutesToTimeStr(setTime)})`);
-        this.logger.verbose(`MoonImage: drawMoonPath: Moon Visible Duration: ${moonVisibleDuration}`);
-        this.logger.verbose(`MoonImage: drawMoonPath: Peak: ${moonPeak} (${this.minutesToTimeStr(moonPeak)})`); 
-        this.logger.verbose(`MoonImage: drawMoonPath: Moon Y Offset: ${yOffset}`);
-        this.logger.verbose(`MoonImage: drawMoonPath: startX: ${startX}, endX: ${endX}`);
+        // this.logger.verbose(`MoonImage: drawMoonPath: Segement ${startX} - ${endX}`);
+        // this.logger.verbose(`MoonImage: drawMoonPath: Moon Rise: ${riseTime} (${this.minutesToTimeStr(riseTime)})`);
+        // this.logger.verbose(`MoonImage: drawMoonPath: Moon Set:  ${setTime} (${this.minutesToTimeStr(setTime)})`);
+        // this.logger.verbose(`MoonImage: drawMoonPath: Moon Visible Duration: ${moonVisibleDuration}`);
+        // this.logger.verbose(`MoonImage: drawMoonPath: Peak: ${moonPeak} (${this.minutesToTimeStr(moonPeak)})`); 
+        // this.logger.verbose(`MoonImage: drawMoonPath: Moon Y Offset: ${yOffset}`);
+        // this.logger.verbose(`MoonImage: drawMoonPath: startX: ${startX}, endX: ${endX}`);
 
         // Draw the moon path
         ctx.beginPath();
@@ -558,7 +567,7 @@ export class MoonImage {
         else if (ageDays < phaseLength * 15) moonImageName = "waning-crescent.png";
         else                                 moonImageName = "new-moon.png";
 
-        this.logger.verbose(`drawMoon: age: ${ageDays}, image: ${moonImageName}`);
+        //this.logger.verbose(`drawMoon: age: ${ageDays}, image: ${moonImageName}`);
 
         return moonImageName;
     }

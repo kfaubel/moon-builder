@@ -74,10 +74,11 @@ export class MoonData {
         try {
             const key = `lat:${lat}-lon:${lon}-date:${dateStr}`;
             
-            sunMoonJson = this.cache.get(key) as MoonJson;
-            if (sunMoonJson !== null) {
-                return sunMoonJson;
-            }
+            this.logger.info("MoonData: CACHE HAS BEEN DISABLED ********************************");
+            // sunMoonJson = this.cache.get(key) as MoonJson;
+            // if (sunMoonJson !== null) {
+            //     return sunMoonJson;
+            // }
 
             const url = `https://api.ipgeolocation.io/astronomy?apiKey=${apiKey}&lat=${lat}&long=${lon}&date=${dateStr}`;
 
@@ -120,6 +121,8 @@ export class MoonData {
                 })
                 .catch((error) => {
                     this.logger.warn(`MoonData: No data: ${error})`);
+                    this.logger.warn(`URL: ${url}`);
+                    sunMoonJson = null;
                 });
             
             if (sunMoonJson === null) {

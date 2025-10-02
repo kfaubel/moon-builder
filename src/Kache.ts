@@ -22,6 +22,7 @@ export class Kache implements KacheInterface {
     private cacheStorage: KacheStorage; 
     private cacheName: string;
     private cachePath: string;
+    private disabled = false;
 
     private logger: LoggerInterface;
 
@@ -30,6 +31,12 @@ export class Kache implements KacheInterface {
         this.cacheName = cacheName;
         this.cachePath = path.resolve(__dirname, "..", this.cacheName);
         this.cacheStorage = {};
+
+        if (typeof process.env.DISABLE_CACHE !== "undefined" ) {
+            this.logger.info("Kache: **** Caching has been disabled via env DISABLE_CACHE ***");
+            this.disabled = true;
+            return;
+        }
 
         try {
             const cacheData: Buffer | null | undefined = fs.readFileSync(this.cachePath);
@@ -57,6 +64,10 @@ export class Kache implements KacheInterface {
     }
 
     public get(key: string): unknown {
+        if (this.disabled) {
+            return null;
+        }
+
         if (this.cacheStorage[key] !== undefined) {
             const cacheItem: KacheItem = this.cacheStorage[key as keyof KacheStorage];
 
@@ -80,6 +91,10 @@ export class Kache implements KacheInterface {
     }
 
     public set(key: string, newItem: unknown, expirationTime: number): void {
+        if (this.disabled) {
+            return;
+        }
+        
         const comment: string = new Date(expirationTime).toString();
         this.logger.verbose(`Cache set: Key: ${key}, exp: ${comment}`);
 
