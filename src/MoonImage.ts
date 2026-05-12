@@ -562,7 +562,7 @@ export class MoonImage {
         else if (ageDays < phaseLength * 5)  moonImageName = "first-quarter.png";
         else if (ageDays < phaseLength * 7)  moonImageName = "waxing-gibbous.png"; 
         else if (ageDays < phaseLength * 9)  moonImageName = "full-moon.png";
-        else if (ageDays < phaseLength * 11) moonImageName = "waning-crescent.png";
+        else if (ageDays < phaseLength * 11) moonImageName = "waning-gibbous.png";
         else if (ageDays < phaseLength * 13) moonImageName = "last-quarter.png";
         else if (ageDays < phaseLength * 15) moonImageName = "waning-crescent.png";
         else                                 moonImageName = "new-moon.png";
